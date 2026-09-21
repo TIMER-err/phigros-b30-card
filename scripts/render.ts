@@ -21,6 +21,8 @@ import { buildB19, buildStats } from '../src/b19'
 import { IllCache } from '../src/ill'
 import { renderTemplate } from '../src/render'
 
+if (existsSync('.env')) process.loadEnvFile('.env')
+
 const env = (k: string, d?: string) => process.env[k] || d
 
 const token = env('PHIGROS_SESSION_TOKEN')

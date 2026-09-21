@@ -4,3 +4,5 @@ vendor
 output
 out.html
 *.log
+.env
+.env.*
