@@ -2,7 +2,8 @@ name: Render Phigros B30
 
 on:
   schedule:
-    - cron: '17 */6 * * *'
+    # 每天 04:00 (UTC+8)，GitHub 的排程可能延迟几十分钟
+    - cron: '0 20 * * *'
   workflow_dispatch:
     inputs:
       force:
