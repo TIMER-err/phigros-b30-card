@@ -1,4 +1,4 @@
-/** Little-endian reader for Phigros' save binary format. */
+/** Little-endian reader for Phigros' save binary format (mirrors phi-plugin lib/ByteReader). */
 export class ByteReader {
   position = 0
   private readonly view: DataView
@@ -13,6 +13,12 @@ export class ByteReader {
 
   byte() {
     return this.buf[this.position++]
+  }
+
+  short() {
+    const v = this.view.getUint16(this.position, true)
+    this.position += 2
+    return v
   }
 
   int32() {
@@ -48,3 +54,5 @@ export class ByteReader {
     return s
   }
 }
+
+export const bit = (n: number, i: number) => ((n >> i) & 1) === 1

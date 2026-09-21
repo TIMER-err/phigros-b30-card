@@ -1,6 +1,6 @@
 import { createDecipheriv } from 'node:crypto'
 import { unzipSync } from 'fflate'
-import { ByteReader } from './reader'
+import { ByteReader, bit } from './reader'
 
 const HOSTS = {
   cn: 'https://rak3ffdi.cloud.tds1.tapapis.cn',
@@ -24,35 +24,48 @@ const b64 = (s: string) => Uint8Array.from(Buffer.from(s, 'base64'))
 const AES_KEY = b64('6Jaa0qVAJZuXkZCLiOa/Ax5tIZVu+taKUN1V1nqwkks=')
 const AES_IV = b64('Kk/wisgNYwcAV8WVGMgyUw==')
 
+/** Difficulty slots as stored in the save; index 4 is LEGACY. */
+export const ALL_LEVELS = ['EZ', 'HD', 'IN', 'AT', 'LEGACY'] as const
+export type LevelName = (typeof ALL_LEVELS)[number]
+
 export interface ChartRecord {
   songId: string
-  /** 0=EZ 1=HD 2=IN 3=AT */
   level: number
+  rank: LevelName
   score: number
   acc: number
   fc: boolean
 }
 
 export interface Summary {
+  saveVersion: number
   challengeModeRank: number
   rankingScore: number
+  gameVersion: number
   avatar: string
-  /** [difficulty][0]=clear [1]=fc [2]=phi, difficulty order EZ,HD,IN,AT */
-  progress: number[][]
+  cleared: number[]
+  fullCombo: number[]
+  phi: number[]
+}
+
+export interface GameUser {
+  showPlayerId: boolean
+  selfIntro: string
+  avatar: string
+  background: string
 }
 
 export interface RawSave {
-  nickname: string
+  /** LeanCloud account nickname, shown as the player id in game. */
+  playerId: string
   updatedAt: string
   summary: Summary
+  gameuser: GameUser
+  money: number[]
   records: ChartRecord[]
 }
 
-async function lc(
-  region: Region,
-  path: string,
-  sessionToken: string
-): Promise<any> {
+async function lc(region: Region, path: string, sessionToken: string) {
   const res = await fetch(HOSTS[region] + path, {
     headers: {
       ...LC_HEADERS[region],
@@ -63,65 +76,84 @@ async function lc(
   })
   if (!res.ok) {
     const body = await res.text().catch(() => '')
-    throw new Error(
-      `LeanCloud ${path} -> ${res.status} ${body.slice(0, 200)}`
-    )
+    throw new Error(`LeanCloud ${path} -> ${res.status} ${body.slice(0, 200)}`)
   }
-  return res.json()
+  return res.json() as Promise<any>
 }
 
 function decryptFile(data: Uint8Array): Uint8Array {
   // byte 0 is the format version, the rest is AES-256-CBC / PKCS7
-  const decipher = createDecipheriv('aes-256-cbc', AES_KEY, AES_IV)
-  const out = Buffer.concat([
-    Uint8Array.from(decipher.update(data.subarray(1))),
-    Uint8Array.from(decipher.final()),
-  ])
-  return Uint8Array.from(out)
+  const d = createDecipheriv('aes-256-cbc', AES_KEY, AES_IV)
+  return Uint8Array.from(
+    Buffer.concat([
+      Uint8Array.from(d.update(data.subarray(1))),
+      Uint8Array.from(d.final()),
+    ])
+  )
 }
 
 function parseSummary(base64: string): Summary {
-  const b = Buffer.from(base64, 'base64')
-  const avatarLen = b.readUInt8(8)
-  let i = 9 + avatarLen
-  const progress: number[][] = []
-  for (let d = 0; d < 4; d++) {
-    progress.push([
-      b.readUInt16LE(i),
-      b.readUInt16LE(i + 2),
-      b.readUInt16LE(i + 4),
-    ])
-    i += 6
+  const r = new ByteReader(b64(base64))
+  const s: Summary = {
+    saveVersion: r.byte(),
+    challengeModeRank: r.short(),
+    rankingScore: r.float32(),
+    gameVersion: r.varInt(),
+    avatar: r.string(),
+    cleared: [],
+    fullCombo: [],
+    phi: [],
   }
+  for (let level = 0; level < 4; level++) {
+    s.cleared[level] = r.short()
+    s.fullCombo[level] = r.short()
+    s.phi[level] = r.short()
+  }
+  return s
+}
+
+function parseGameUser(data: Uint8Array): GameUser {
+  const r = new ByteReader(data)
   return {
-    challengeModeRank: b.readUInt16LE(1),
-    rankingScore: b.readFloatLE(3),
-    avatar: b.toString('utf8', 9, 9 + avatarLen),
-    progress,
+    showPlayerId: bit(r.byte(), 0),
+    selfIntro: r.string(),
+    avatar: r.string(),
+    background: r.string(),
   }
+}
+
+/** Only `money` is needed for the card, but the fields before it must be read in order. */
+function parseMoney(data: Uint8Array): number[] {
+  const r = new ByteReader(data)
+  r.byte() // flag bits
+  r.string() // completed
+  r.varInt() // songUpdateInfo
+  r.short() // challengeModeRank
+  return [r.varInt(), r.varInt(), r.varInt(), r.varInt(), r.varInt()]
 }
 
 function parseGameRecord(data: Uint8Array): ChartRecord[] {
   const r = new ByteReader(data)
   const count = r.varInt()
   const records: ChartRecord[] = []
-  for (let i = 0; i < count; i++) {
+  for (let i = 0; i < count && r.remaining > 0; i++) {
     const name = r.string()
     const songId = name.endsWith('.0') ? name.slice(0, -2) : name
     const len = r.varInt()
     const end = r.position + len
     const exists = r.byte()
     const fcMask = r.byte()
-    for (let level = 0; level < 4; level++) {
-      if (((exists >> level) & 1) === 0) continue
+    for (let level = 0; level < 5; level++) {
+      if (!bit(exists, level)) continue
       const score = r.int32()
       const acc = r.float32()
       records.push({
         songId,
         level,
+        rank: ALL_LEVELS[level],
         score,
         acc,
-        fc: ((fcMask >> level) & 1) === 1,
+        fc: (score === 1e6 && acc === 100) || bit(fcMask, level),
       })
     }
     r.position = end
@@ -144,13 +176,18 @@ export async function fetchSave(
   const zipRes = await fetch(save.gameFile.url)
   if (!zipRes.ok) throw new Error(`下载存档失败: ${zipRes.status}`)
   const files = unzipSync(new Uint8Array(await zipRes.arrayBuffer()))
-
   if (!files.gameRecord) throw new Error('存档中缺少 gameRecord')
 
   return {
-    nickname: me.nickname ?? 'Player',
+    playerId: me.nickname ?? 'Player',
     updatedAt: save.updatedAt,
     summary: parseSummary(save.summary),
+    gameuser: files.user
+      ? parseGameUser(decryptFile(files.user))
+      : { showPlayerId: false, selfIntro: '', avatar: '', background: '' },
+    money: files.gameProgress
+      ? parseMoney(decryptFile(files.gameProgress))
+      : [0, 0, 0, 0, 0],
     records: parseGameRecord(decryptFile(files.gameRecord)),
   }
 }

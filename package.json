@@ -1,21 +1,19 @@
 {
-  "name": "phigros-profile-card",
+  "name": "phigros-b30-card",
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "engines": {
-    "node": "22.x"
-  },
   "scripts": {
-    "build:songs": "node scripts/build-songs.mjs",
-    "preview": "tsx scripts/preview.ts",
+    "render": "tsx scripts/render.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "fflate": "^0.8.2"
+    "art-template": "^4.13.2",
+    "fflate": "^0.8.2",
+    "puppeteer": "^23.11.1"
   },
   "devDependencies": {
-    "@vercel/node": "^5.1.0",
+    "@types/node": "^22.10.2",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2"
   }

@@ -1,0 +1,162 @@
+/**
+ * Renders the phi-plugin B30 card and writes it next to a meta.json describing
+ * the save it was built from. Skips rendering when nothing changed.
+ *
+ * Env:
+ *   PHIGROS_SESSION_TOKEN  required
+ *   PHIGROS_REGION         cn | intl          (default cn)
+ *   PHI_PLUGIN_ROOT        phi-plugin checkout (default vendor/phi-plugin)
+ *   OUT_DIR                output directory    (default output)
+ *   ILL_CACHE              illustration cache  (default .cache/ill)
+ *   B30_NUM                charts to list      (default 33)
+ *   IMG_TYPE               jpeg | png          (default jpeg)
+ *   THEME                  star | snow | none  (default star)
+ *   FORCE                  set to 1 to re-render even when unchanged
+ */
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import path from 'node:path'
+import { fetchSave, type Region } from '../src/save'
+import { Info } from '../src/info'
+import { buildB19, buildStats } from '../src/b19'
+import { IllCache } from '../src/ill'
+import { renderTemplate } from '../src/render'
+
+const env = (k: string, d?: string) => process.env[k] || d
+
+const token = env('PHIGROS_SESSION_TOKEN')
+if (!token) throw new Error('缺少环境变量 PHIGROS_SESSION_TOKEN')
+
+const pluginRoot = path.resolve(env('PHI_PLUGIN_ROOT', 'vendor/phi-plugin')!)
+const outDir = path.resolve(env('OUT_DIR', 'output')!)
+const illDir = path.resolve(env('ILL_CACHE', '.cache/ill')!)
+const num = Number(env('B30_NUM', '33'))
+const imgType = env('IMG_TYPE', 'jpeg') as 'jpeg' | 'png'
+const theme = env('THEME', 'star')!
+
+if (!existsSync(path.join(pluginRoot, 'resources', 'info', 'info.csv'))) {
+  throw new Error(`未找到 phi-plugin 资源: ${pluginRoot}`)
+}
+
+const outFile = path.join(outDir, `b30.${imgType === 'png' ? 'png' : 'jpg'}`)
+const metaFile = path.join(outDir, 'meta.json')
+
+const save = await fetchSave(token, env('PHIGROS_REGION', 'cn') as Region)
+console.log(`存档: ${save.playerId}  rks ${save.summary.rankingScore.toFixed(4)}  更新于 ${save.updatedAt}`)
+
+const prev = existsSync(metaFile)
+  ? JSON.parse(readFileSync(metaFile, 'utf8'))
+  : null
+if (
+  !env('FORCE') &&
+  prev?.updatedAt === save.updatedAt &&
+  prev?.num === num &&
+  existsSync(outFile)
+) {
+  console.log('存档未变化，跳过渲染')
+  process.exit(0)
+}
+
+const info = new Info(pluginRoot)
+const { phi, b19_list, com_rks } = buildB19(save, info, num)
+
+const ills = new IllCache(illDir)
+for (const s of [...phi, ...b19_list]) {
+  if (s) s.illustration = ills.local(s.illustration)
+}
+const bg = save.gameuser.background
+  ? info.background(save.gameuser.background)
+  : null
+const background = bg ? ills.local(bg) : ''
+const { total, failed } = await ills.download()
+console.log(`曲绘: 新下载 ${total} 张，失败 ${failed} 张`)
+
+const money = save.money
+const gameuser = {
+  avatar: info.avatar(save.gameuser.avatar),
+  ChallengeMode: Math.floor(save.summary.challengeModeRank / 100),
+  ChallengeModeRank: save.summary.challengeModeRank % 100,
+  rks: save.summary.rankingScore,
+  data: [
+    money[4] && `${money[4]}PiB`,
+    money[3] && `${money[3]}TiB`,
+    money[2] && `${money[2]}GiB`,
+    money[1] && `${money[1]}MiB`,
+    money[0] && `${money[0]}KiB`,
+  ]
+    .filter(Boolean)
+    .join(' '),
+  selfIntro: save.gameuser.selfIntro,
+  PlayerId: richText(save.playerId),
+}
+
+const formatted = new Date(save.updatedAt)
+  .toLocaleString('sv-SE', { timeZone: env('TZ', 'Asia/Shanghai') })
+  .replace(/-/g, '/')
+
+mkdirSync(outDir, { recursive: true })
+const box = await renderTemplate(
+  'b19/b19',
+  {
+    phi,
+    b19_list,
+    PlayerId: gameuser.PlayerId,
+    Rks: save.summary.rankingScore.toFixed(4),
+    Date: formatted,
+    ChallengeMode: gameuser.ChallengeMode,
+    ChallengeModeRank: gameuser.ChallengeModeRank,
+    background,
+    theme,
+    gameuser,
+    nnum: num,
+    stats: buildStats(save),
+    // phi-plugin only surfaces this when its constants disagree with the save.
+    spInfo:
+      Math.abs(com_rks - save.summary.rankingScore) > 1e-4
+        ? [`Real RKS: ${com_rks.toFixed(4)}`]
+        : [],
+    b30Analysis: null,
+    Version: { ver: readVersion() },
+  },
+  { pluginRoot, outFile, type: imgType }
+)
+
+writeFileSync(
+  metaFile,
+  JSON.stringify(
+    {
+      playerId: save.playerId,
+      rks: save.summary.rankingScore,
+      updatedAt: save.updatedAt,
+      num,
+      renderedAt: new Date().toISOString(),
+      size: box,
+    },
+    null,
+    2
+  ) + '\n'
+)
+console.log(`已生成 ${outFile} (${box.width}x${box.height})`)
+
+/** Phigros player ids may embed Unity rich text tags; phi-plugin converts them to HTML. */
+function richText(s: string) {
+  const escaped = s.replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  return escaped
+    .replace(
+      /&lt;color\s*=\s*(.*?)&gt;(.*?)&lt;\/color&gt;/g,
+      (_, c: string, t: string) =>
+        `<span style="color:${c.replace(/[\s"]/g, '')}">${t}</span>`
+    )
+    .replace(/&lt;i&gt;(.*?)&lt;\/i&gt;/g, '<i>$1</i>')
+    .replace(/&lt;b&gt;(.*?)&lt;\/b&gt;/g, '<b>$1</b>')
+}
+
+function readVersion() {
+  try {
+    const pkg = JSON.parse(
+      readFileSync(path.join(pluginRoot, 'package.json'), 'utf8')
+    )
+    return `v${pkg.version}`
+  } catch {
+    return ''
+  }
+}

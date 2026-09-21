@@ -1,0 +1,108 @@
+name: Render Phigros B30
+
+on:
+  schedule:
+    - cron: '17 */6 * * *'
+  workflow_dispatch:
+    inputs:
+      force:
+        description: '即使存档未更新也重新渲染'
+        type: boolean
+        default: false
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'scripts/**'
+      - '.github/workflows/render.yml'
+
+concurrency:
+  group: render-b30
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+env:
+  PHI_PLUGIN_ROOT: vendor/phi-plugin
+  OUT_DIR: output
+  ILL_CACHE: .cache/ill
+  TZ: Asia/Shanghai
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # Previous render + meta.json: lets an unchanged save skip the whole render.
+      - name: Cache output
+        uses: actions/cache@v4
+        with:
+          path: output
+          key: b30-output-${{ github.run_id }}
+          restore-keys: b30-output-
+
+      # ~126 MB checkout (templates, CSS, fonts, avatars).
+      - name: Cache phi-plugin
+        uses: actions/cache@v4
+        with:
+          path: vendor/phi-plugin
+          key: phi-plugin-${{ github.run_id }}
+          restore-keys: phi-plugin-
+
+      - name: Sync phi-plugin
+        run: |
+          if [ -d "$PHI_PLUGIN_ROOT/.git" ]; then
+            git -C "$PHI_PLUGIN_ROOT" fetch --depth=1 origin main
+            git -C "$PHI_PLUGIN_ROOT" reset --hard FETCH_HEAD
+          else
+            git clone --depth=1 https://github.com/Catrong/phi-plugin.git "$PHI_PLUGIN_ROOT"
+          fi
+          echo "PLUGIN_SHA=$(git -C "$PHI_PLUGIN_ROOT" rev-parse --short HEAD)" >> "$GITHUB_ENV"
+
+      # Only the ~35 illustrations a card needs, reused across runs.
+      - name: Cache illustrations
+        uses: actions/cache@v4
+        with:
+          path: .cache/ill
+          key: phi-ill-${{ github.run_id }}
+          restore-keys: phi-ill-
+
+      - name: Cache Chromium
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/puppeteer
+          key: puppeteer-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - run: npm ci
+
+      - name: Render
+        env:
+          PHIGROS_SESSION_TOKEN: ${{ secrets.PHIGROS_SESSION_TOKEN }}
+          PHIGROS_REGION: ${{ vars.PHIGROS_REGION || 'cn' }}
+          B30_NUM: ${{ vars.B30_NUM || '33' }}
+          IMG_TYPE: ${{ vars.IMG_TYPE || 'jpeg' }}
+          THEME: ${{ vars.PHI_THEME || 'star' }}
+          FORCE: ${{ (inputs.force || github.event_name == 'push') && '1' || '' }}
+        run: npm run render
+
+      # Orphan branch, force-pushed: the image never accumulates git history.
+      - name: Publish to output branch
+        run: |
+          if [ ! -f "$OUT_DIR/meta.json" ]; then echo "没有产物，跳过发布"; exit 0; fi
+          publish="$RUNNER_TEMP/publish"
+          mkdir -p "$publish"
+          cp "$OUT_DIR"/meta.json "$OUT_DIR"/b30.* "$publish/"
+          cd "$publish"
+          git init -q -b output
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "render $(date -u +%FT%TZ) (phi-plugin ${PLUGIN_SHA})"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" output
