@@ -43,8 +43,9 @@ TapTap 扫码 ──> sessionToken ──> LeanCloud 取档 ──> AES 解密 �
 ```
 
 > [!NOTE]
-> URL 固定不变，每天覆盖同一路径。但 GitHub 的 camo 图片代理有自己的缓存（数小时级别），
-> 主页上看到新图会比 workflow 跑完晚一些，这是平台行为，刷新浏览器没用。
+> URL 固定不变，每天覆盖同一路径。`raw.githubusercontent.com` 是 GitHub 自家域名，
+> 不走 camo 代理，缓存只有 Fastly CDN 和浏览器两层，都是 `max-age=300`。
+> 渲染完最多 5 分钟就能看到新图，性急就 `Ctrl+Shift+R` 强刷。
 
 ### 可选 Variables
 
@@ -152,6 +153,17 @@ RKS 计算：单谱 `acc < 70` 记 0，否则 `((acc - 55) / 45)² × 定数`；
 ## 常见问题
 
 **图片 404** —— workflow 还没成功跑过，或 `output` 分支没创建。看 Actions 日志。
+
+**图片还是旧的** —— 先确认源头已更新：
+
+```bash
+curl -s https://raw.githubusercontent.com/<你>/phigros-b30-card/output/meta.json
+```
+
+`renderedAt` 是新的就是本地缓存，强刷即可。
+
+**渲染出来不是自己的成绩** —— `_GameSave` 这个 class 跨账号可读，必须按 `user` 指针过滤
+再按 `modifiedAt` 取最新。本仓库已处理，如果你自己改过 `src/save.ts` 注意这点。
 
 **`LeanCloud /users/me -> 400`** —— sessionToken 失效了（在别的设备重新登录会顶掉），
 重新 `npm run login`。
