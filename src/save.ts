@@ -55,6 +55,7 @@ export interface GameUser {
 export interface RawSave {
   /** LeanCloud account nickname, shown as the player id in game. */
   playerId: string
+  /** In-game save time (`modifiedAt`), not the LeanCloud row timestamp. */
   updatedAt: string
   summary: Summary
   gameuser: GameUser
@@ -163,13 +164,25 @@ export async function fetchSave(
   sessionToken: string,
   region: Region = 'cn'
 ): Promise<RawSave> {
-  const [me, saves] = await Promise.all([
-    lc(region, '/users/me', sessionToken),
-    lc(region, '/classes/_GameSave?limit=1', sessionToken),
-  ])
+  const me = await lc(region, '/users/me', sessionToken)
 
-  const save = saves.results?.[0]
-  if (!save?.gameFile?.url) throw new Error('该账号没有云存档')
+  // _GameSave is readable across accounts, so the user pointer filter is required.
+  const where = encodeURIComponent(
+    JSON.stringify({
+      user: { __type: 'Pointer', className: '_User', objectId: me.objectId },
+    })
+  )
+  const saves = await lc(
+    region,
+    `/classes/_GameSave?limit=100&include=gameFile&where=${where}`,
+    sessionToken
+  )
+
+  const modified = (s: any) => new Date(s.modifiedAt?.iso ?? s.updatedAt).getTime()
+  const save = (saves.results ?? [])
+    .filter((s: any) => s?.gameFile?.url)
+    .sort((a: any, b: any) => modified(b) - modified(a))[0]
+  if (!save) throw new Error('该账号没有云存档，请先在游戏里同步')
 
   const zipRes = await fetch(save.gameFile.url)
   if (!zipRes.ok) throw new Error(`下载存档失败: ${zipRes.status}`)
@@ -178,7 +191,7 @@ export async function fetchSave(
 
   return {
     playerId: me.nickname ?? 'Player',
-    updatedAt: save.updatedAt,
+    updatedAt: save.modifiedAt?.iso ?? save.updatedAt,
     summary: parseSummary(save.summary),
     gameuser: files.user
       ? parseGameUser(decryptFile(files.user))
