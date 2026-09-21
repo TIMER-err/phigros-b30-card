@@ -13,10 +13,11 @@
 ## 部署
 
 1. Fork / push 本仓库。
-2. Settings → Secrets and variables → Actions：
+2. 本地 `npm run login` 扫码拿到 sessionToken（见下）。
+3. Settings → Secrets and variables → Actions：
    - Secret `PHIGROS_SESSION_TOKEN`：你的 Phigros sessionToken（25 位）
-3. Actions 页面手动跑一次 **Render Phigros B30**。
-4. 成功后图片在 `output` 分支的 `b30.jpg`，用上面的 raw 链接引用。
+4. Actions 页面手动跑一次 **Render Phigros B30**。
+5. 成功后图片在 `output` 分支的 `b30.jpg`，用上面的 raw 链接引用。
 
 可选 Variables：
 
@@ -31,9 +32,28 @@
 
 ## 获取 sessionToken
 
+### TapTap 扫码登录（推荐）
+
+```bash
+npm install
+npm run login          # 国服
+npm run login -- intl  # 国际服
+```
+
+终端会直接画出二维码，用 **TapTap App** 扫描并确认授权，随后打印 `sessionToken`。
+扫不了码就访问 https://accounts.taptap.cn/device 手动输入终端给出的 5 位 code。
+
+走的是 Phigros 自己的 TapTap OAuth device code 流程（`accounts.tapapis.cn` →
+`open.tapapis.cn/account/profile` → LeanCloud `/users` 换 sessionToken），
+和 phi-plugin 的 `lib/TapTap/` 一致。**只在本地跑**，不要放进 workflow——
+日志是公开的，token 会泄露。
+
+### 手动从设备取
+
 - Android：`/Android/data/com.PigeonGames.Phigros/files/.userdata`
 - iOS：导出 app 沙盒后查看 `Documents` 下的存档
-- 或用 phi-plugin 的扫码登录流程
+
+> sessionToken 长期有效，除非在别处重新登录把它顶掉。
 
 ## 缓存
 
@@ -62,6 +82,7 @@ PHIGROS_SESSION_TOKEN=xxx npm run render   # 输出 output/b30.jpg
 
 | 文件 | 作用 |
 | --- | --- |
+| `src/taptap.ts` | TapTap device-code 扫码登录 → sessionToken |
 | `src/save.ts` | LeanCloud 取档、AES-256-CBC 解密、解析 `gameRecord`/`user`/`gameProgress`/`summary` |
 | `src/info.ts` | 从 phi-plugin 的 `info.csv` 读定数表，解析曲绘/头像/背景资源 |
 | `src/b19.ts` | 复刻 `Save.getB19`：单曲 rks、φ1-3、B27、推分建议 |

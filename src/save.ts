@@ -2,23 +2,20 @@ import { createDecipheriv } from 'node:crypto'
 import { unzipSync } from 'fflate'
 import { ByteReader, bit } from './reader'
 
-const HOSTS = {
-  cn: 'https://rak3ffdi.cloud.tds1.tapapis.cn',
-  intl: 'https://phigrosservice.cloud.tds1.tapapis.com',
-} as const
-
-const LC_HEADERS = {
+export const LC = {
   cn: {
+    base: 'https://rak3ffdi.cloud.tds1.tapapis.cn/1.1',
     'X-LC-Id': 'rAK3FfdieFob2Nn8Am',
     'X-LC-Key': 'Qr9AEqtuoSVS3zeD6iVbM4ZC0AtkJcQ89tywVyi0',
   },
   intl: {
-    'X-LC-Id': 'nTdRVJwqgdmWZawrRRrlMCsX-c7SMHvD',
-    'X-LC-Key': 'HAoyFB18NsEZpnUrTdvhLcbC',
+    base: 'https://kviehlel.cloud.ap-sg.tapapis.com/1.1',
+    'X-LC-Id': 'kviehleldgxsagpozb',
+    'X-LC-Key': 'tG9CTm0LDD736k9HMM9lBZrbeBGRmUkjSfNLDNib',
   },
 } as const
 
-export type Region = keyof typeof HOSTS
+export type Region = keyof typeof LC
 
 const b64 = (s: string) => Uint8Array.from(Buffer.from(s, 'base64'))
 const AES_KEY = b64('6Jaa0qVAJZuXkZCLiOa/Ax5tIZVu+taKUN1V1nqwkks=')
@@ -66,9 +63,10 @@ export interface RawSave {
 }
 
 async function lc(region: Region, path: string, sessionToken: string) {
-  const res = await fetch(HOSTS[region] + path, {
+  const { base, ...keys } = LC[region]
+  const res = await fetch(base + path, {
     headers: {
-      ...LC_HEADERS[region],
+      ...keys,
       'X-LC-Session': sessionToken,
       Accept: 'application/json',
       'User-Agent': 'LeanCloud-CSharp-SDK/1.0.3',
@@ -166,8 +164,8 @@ export async function fetchSave(
   region: Region = 'cn'
 ): Promise<RawSave> {
   const [me, saves] = await Promise.all([
-    lc(region, '/1.1/users/me', sessionToken),
-    lc(region, '/1.1/classes/_GameSave?limit=1', sessionToken),
+    lc(region, '/users/me', sessionToken),
+    lc(region, '/classes/_GameSave?limit=1', sessionToken),
   ])
 
   const save = saves.results?.[0]
