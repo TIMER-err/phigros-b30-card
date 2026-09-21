@@ -74,8 +74,15 @@ export async function pollQrCode(
   })
   const json = (await res.json()) as any
   if (json.success) return json.data as TapToken
+  // pending: not scanned yet; waiting: scanned, user hasn't confirmed in the app
   const err = json.data?.error
-  if (err === 'authorization_pending' || err === 'slow_down') return null
+  if (
+    err === 'authorization_pending' ||
+    err === 'authorization_waiting' ||
+    err === 'slow_down'
+  ) {
+    return null
+  }
   throw new Error(`扫码登录失败: ${json.data?.error_description ?? err}`)
 }
 
