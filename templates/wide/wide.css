@@ -1,0 +1,296 @@
+/* b19.css pins the body to 1200px for the tall card; this layout is wider. */
+body {
+  width: 1522px;
+  height: fit-content;
+}
+
+/* Landscape card: player + rks trend on the left, a dense best-N grid on the right. */
+
+.wide {
+  width: 1522px;
+  height: 450px;
+  display: flex;
+  gap: 16px;
+  padding: 16px;
+  box-sizing: border-box;
+  color: #fff;
+}
+
+/* Aldrich only here: the b19 cards rely on PHI's line-box metrics to position
+   text inside their fixed-height badges, so they must inherit the body font. */
+.side {
+  font-family: "Aldrich", "PHI", "NOTO", "NotoSansJP";
+  width: 300px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: rgba(0, 0, 0, 0.48);
+  border-radius: 10px;
+  padding: 14px;
+  box-sizing: border-box;
+}
+
+.who {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.who-text {
+  min-width: 0;
+}
+
+.name {
+  font-size: 22px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.date {
+  font-size: 12px;
+  color: #b9c6d2;
+  margin-top: 2px;
+}
+
+.rks-big {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.rks-label {
+  font-size: 11px;
+  letter-spacing: 1px;
+  color: #8fa3b5;
+  width: 100%;
+}
+
+.rks-value {
+  font-size: 40px;
+  font-weight: 700;
+  line-height: 1;
+  text-shadow: 0 0 12px rgba(120, 200, 255, 0.55);
+}
+
+.rks-delta {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.rks-delta.up {
+  color: var(--phi-color);
+}
+
+.rks-delta.down {
+  color: #ff6b6b;
+}
+
+.chips {
+  display: flex;
+  gap: 8px;
+}
+
+.chip {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 13px;
+}
+
+/* The challenge png is a bracket frame; the rank sits inside it. */
+.chip.clg {
+  flex-direction: column;
+  gap: 0;
+  padding: 2px 10px;
+}
+
+.chip.clg img {
+  width: 52px;
+  height: auto;
+  margin-bottom: -22px;
+}
+
+.chip.clg p {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.chip.data img {
+  height: 18px;
+}
+
+.chip.data p {
+  font-size: 11px;
+  color: #cfd8e3;
+}
+
+.stats {
+  display: flex;
+  gap: 6px;
+}
+
+.stat {
+  flex: 1;
+  border-radius: 6px;
+  padding: 5px 0;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.08);
+  border-top: 3px solid #888;
+}
+
+.stat-EZ { border-top-color: var(--EZ); }
+.stat-HD { border-top-color: var(--HD); }
+.stat-IN { border-top-color: var(--IN); }
+.stat-AT { border-top-color: var(--AT); }
+
+.stat-title {
+  font-size: 10px;
+  color: #a8b6c4;
+}
+
+.stat-num {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.stat-sub {
+  font-size: 13px;
+  color: var(--phi-color);
+  display: flex;
+  /* An img centres on the whole line box while digits sit on the baseline, so
+     centring would hang the icon ~2px low. Baseline puts its bottom edge on the
+     text baseline, like a glyph. */
+  align-items: baseline;
+  justify-content: center;
+  gap: 2px;
+  line-height: 1;
+}
+
+/* Same phi icon the score panels use; left gold here against the dark panel. */
+.stat-phi {
+  height: 11px;
+  width: auto;
+  /* The glyph fills the png edge to edge, while the digits leave descender
+     room, so sitting exactly on the baseline reads as too high. */
+  position: relative;
+  top: 1px;
+}
+
+.chart {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.chart-head,
+.chart-foot {
+  flex-shrink: 0;
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: #9fb0c0;
+}
+
+.chart-head p:first-child {
+  letter-spacing: 1px;
+}
+
+.chart-body {
+  flex: 1;
+  min-height: 0;
+  margin: 10px 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.chart-body svg {
+  width: 100%;
+  height: 100%;
+  color: #7fd7ff;
+  stroke: currentColor;
+  stroke-width: 2px;
+  overflow: visible;
+  /* SVG y grows downward; flip so higher rks sits higher. */
+  transform: scaleY(-1);
+  filter: drop-shadow(0 0 3px rgba(127, 215, 255, 0.8));
+}
+
+.chart-body circle {
+  fill: #fff;
+  stroke-width: 0;
+}
+
+.chart-body line {
+  marker-start: url(#dot);
+}
+
+.chart-body line:last-child {
+  marker-end: url(#dot);
+}
+
+.no-data {
+  font-size: 12px;
+  color: #6b7a88;
+}
+
+.grid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(3, 386px);
+  grid-template-rows: repeat(4, 100px);
+  gap: 6px 8px;
+  align-content: center;
+  justify-content: center;
+}
+
+/* Cards are phi-plugin's b19 markup rendered at its native 360x100, so they
+   look identical to the tall card. Do not re-size the badges: their absolute
+   positions are tuned against those exact dimensions.
+   .rank-* overhangs 13% of .ill-box to the left, so each column reserves 26px
+   for it -- zeroing the margin clips the difficulty text. */
+.cell .song {
+  margin-left: 26px;
+  margin-bottom: 0;
+}
+
+/* Phi slots are marked with the same icon the score panel uses, not a φ glyph.
+   Laying the badge out inline (rather than as flex) lets the icon sit on the
+   text baseline like a glyph; line-height equal to the badge height then
+   centres that single line box vertically. */
+.cell .num {
+  line-height: 15.6px;
+  text-align: center;
+}
+
+.cell .num p {
+  display: inline;
+  line-height: inherit;
+}
+
+.cell .num-phi {
+  height: 9px;
+  width: auto;
+  margin-right: 1px;
+  /* phi.png is gold; the badge is white with black text. */
+  filter: brightness(0);
+}

@@ -8,3 +8,7 @@ out.html
 .env.*
 *-preview.jpg
 data/history-seed.json
+.preview
+crop.mjs
+measure.mjs
+preview-wide.ts

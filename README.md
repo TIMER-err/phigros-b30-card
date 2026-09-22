@@ -9,6 +9,10 @@
   <a href="../../actions/workflows/render.yml"><img src="../../actions/workflows/render.yml/badge.svg" alt="Render"></a>
 </p>
 
+<p align="center">
+  <img width="820" src="https://raw.githubusercontent.com/TIMER-err/phigros-b30-card/output/wide.jpg" alt="Wide">
+</p>
+
 <table align="center">
   <tr>
     <td align="center"><b>b30.jpg</b> 成绩总览</td>
@@ -32,7 +36,13 @@ TapTap 扫码 ──> sessionToken ──> LeanCloud 取档 ──> AES 解密 �
               output 分支 <── 截图 <── puppeteer <── art-template <── phi-plugin 模板
 ```
 
-产出两张图：`b30.jpg`（成绩总览）和 `update.jpg`（成绩变动 + RKS 曲线）。
+产出三张图：
+
+| 文件 | 尺寸 | 内容 |
+| --- | --- | --- |
+| `b30.jpg` | 1200×1894 | 成绩总览，等同 `/b30` |
+| `update.jpg` | 800×1536 | 成绩变动 + RKS 曲线，等同 `/update` |
+| `wide.jpg` | 1522×450 | 横版，玩家信息 + RKS 曲线 + 前 12 首 |
 
 ## 部署
 
@@ -68,6 +78,8 @@ Settings → Secrets and variables → Actions → Variables：
 | `B30_NUM` | `33` | 列出的成绩条数，超过 27 的部分显示在 OVER FLOW 之后 |
 | `IMG_TYPE` | `jpeg` | `jpeg` / `png` |
 | `UPDATE_CARD` | `1` | 设为 `0` 关闭成绩变动图 |
+| `WIDE_CARD` | `1` | 设为 `0` 关闭横版图 |
+| `WIDE_NUM` | `12` | 横版展示的成绩数，网格 3 列，建议取 3 的倍数 |
 | `PHI_THEME` | `star` | `star` / `snow` / `topText` / 留空 |
 
 ### 改更新时间
@@ -155,6 +167,7 @@ FORCE=1 npm run render  # 存档没变也重渲
 | `src/update.ts` | 复刻 `session.js` 的 `box_line` 分行布局和 RKS 折线 |
 | `src/ill.ts` | 按需下载曲绘到本地缓存 |
 | `src/render.ts` | art-template 编译 `.art` + puppeteer 截图 |
+| `templates/wide/` | 横版模板，自写布局但直接复用 b19 的卡片标记与 CSS |
 
 定数表在每次运行时从 phi-plugin 仓库读取，游戏更新出新曲后无需改代码。
 

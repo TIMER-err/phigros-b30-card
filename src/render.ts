@@ -8,6 +8,8 @@ import puppeteer from 'puppeteer'
 export interface RenderOptions {
   pluginRoot: string
   outFile: string
+  /** Directory holding the `.art` file, when it is not one of phi-plugin's. */
+  tplRoot?: string
   /** Extra scale applied by the page itself, as phi-plugin's renderScale does. */
   scale?: number
   type?: 'jpeg' | 'png'
@@ -27,12 +29,15 @@ export async function renderTemplate(
   const resPath = path.join(opts.pluginRoot, 'resources').replace(/\\/g, '/') + '/'
   const layoutPath = resPath + 'html/common/layout/'
   const [app, name] = tpl.split('/')
-  const tplFile = path.join(opts.pluginRoot, 'resources', 'html', app, `${name}.art`)
+  const tplFile = opts.tplRoot
+    ? path.join(opts.tplRoot, app, `${name}.art`)
+    : path.join(opts.pluginRoot, 'resources', 'html', app, `${name}.art`)
 
   const data = {
     ...params,
     themeInfo: null,
     tplFile,
+    tplResPath: path.dirname(tplFile).replace(/\\/g, '/') + '/',
     pluResPath: resPath,
     _res_path: resPath,
     _imgPath: resPath + 'html/otherimg/',
@@ -50,10 +55,12 @@ export async function renderTemplate(
   // All resource references are absolute, so the page can live anywhere.
   const htmlFile = path.join(mkdtempSync(path.join(os.tmpdir(), 'phi-')), `${name}.html`)
   writeFileSync(htmlFile, html)
+  if (process.env.DEBUG_HTML) console.log(`[html] ${htmlFile}`)
   mkdirSync(path.dirname(opts.outFile), { recursive: true })
 
   const browser = await puppeteer.launch({
     headless: true,
+    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
     args: [
       '--no-sandbox',
       '--disable-setuid-sandbox',

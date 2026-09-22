@@ -1,6 +1,6 @@
 /**
- * Renders the phi-plugin B30 card and writes it next to a meta.json describing
- * the save it was built from. Skips rendering when nothing changed.
+ * Renders the Phigros cards and writes them next to a meta.json describing the
+ * save they were built from. Skips rendering when nothing changed.
  *
  * Env:
  *   PHIGROS_SESSION_TOKEN  required
@@ -12,6 +12,8 @@
  *   IMG_TYPE               jpeg | png          (default jpeg)
  *   THEME                  star | snow | none  (default star)
  *   UPDATE_CARD            0 to skip the score-history card
+ *   WIDE_CARD              0 to skip the landscape card
+ *   WIDE_NUM               charts on the landscape card (default 12)
  *   FORCE                  set to 1 to re-render even when unchanged
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
@@ -45,7 +47,11 @@ if (!existsSync(path.join(pluginRoot, 'resources', 'info', 'info.csv'))) {
 const ext = imgType === 'png' ? 'png' : 'jpg'
 const outFile = path.join(outDir, `b30.${ext}`)
 const updateFile = path.join(outDir, `update.${ext}`)
+const wideFile = path.join(outDir, `wide.${ext}`)
 const wantUpdate = env('UPDATE_CARD') !== '0'
+const wantWide = env('WIDE_CARD') !== '0'
+// The landscape grid is 3 columns wide, so keep it a multiple of 3.
+const wideNum = Number(env('WIDE_NUM', '12'))
 const metaFile = path.join(outDir, 'meta.json')
 
 const save = await fetchSave(token, env('PHIGROS_REGION', 'cn') as Region)
@@ -59,7 +65,8 @@ if (
   prev?.updatedAt === save.updatedAt &&
   prev?.num === num &&
   existsSync(outFile) &&
-  (!wantUpdate || existsSync(updateFile))
+  (!wantUpdate || existsSync(updateFile)) &&
+  (!wantWide || existsSync(wideFile))
 ) {
   console.log('存档未变化，跳过渲染')
   process.exit(0)
@@ -145,12 +152,15 @@ const box = await renderTemplate(
   { pluginRoot, outFile, type: imgType }
 )
 
+const rksDelta =
+  history.rks.length > 1
+    ? history.rks[history.rks.length - 1].value - history.rks[history.rks.length - 2].value
+    : 0
+const rksDeltaText =
+  Math.abs(rksDelta) >= 1e-4 ? `${rksDelta > 0 ? '+' : ''}${rksDelta.toFixed(4)}` : ''
+
 let updateBox = null
 if (wantUpdate) {
-  const rksDelta =
-    history.rks.length > 1
-      ? history.rks[history.rks.length - 1].value - history.rks[history.rks.length - 2].value
-      : 0
   const tips = readFileSync(
     path.join(pluginRoot, 'resources', 'info', 'tips.txt'),
     'utf8'
@@ -171,18 +181,52 @@ if (wantUpdate) {
       tips: tips[Math.floor(Math.random() * tips.length)],
       task_data: null,
       dan: null,
-      added_rks_notes: [
-        Math.abs(rksDelta) >= 1e-4
-          ? `${rksDelta > 0 ? '+' : ''}${rksDelta.toFixed(4)}`
-          : '',
-        '',
-      ],
+      added_rks_notes: [rksDeltaText, ''],
       ...rksLine,
       Version: { ver: readVersion() },
     },
     { pluginRoot, outFile: updateFile, type: imgType }
   )
   console.log(`已生成 ${updateFile} (${updateBox.width}x${updateBox.height})`)
+}
+
+let wideBox = null
+if (wantWide) {
+  const cards: Record<string, unknown>[] = []
+  for (const [i, p] of phi.entries()) {
+    if (p) cards.push({ ...p, label: `${i + 1}`, isPhi: true })
+  }
+  for (const c of b19_list) {
+    if (cards.length >= wideNum) break
+    // The phi slots already show these charts; skip the duplicates.
+    if (cards.some((x) => x.isPhi && x.id === c.id && x.rank === c.rank)) continue
+    cards.push({ ...c, label: `#${c.num}`, isPhi: false })
+  }
+
+  wideBox = await renderTemplate(
+    'wide/wide',
+    {
+      cards,
+      gameuser,
+      Rks: save.summary.rankingScore.toFixed(4),
+      rksDelta: rksDeltaText,
+      Date: formatted,
+      ChallengeMode: gameuser.ChallengeMode,
+      ChallengeModeRank: gameuser.ChallengeModeRank,
+      stats: buildStats(save),
+      background,
+      theme,
+      ...rksLine,
+      Version: { ver: readVersion() },
+    },
+    {
+      pluginRoot,
+      tplRoot: path.resolve('templates'),
+      outFile: wideFile,
+      type: imgType,
+    }
+  )
+  console.log(`已生成 ${wideFile} (${wideBox.width}x${wideBox.height})`)
 }
 
 writeFileSync(
@@ -196,6 +240,7 @@ writeFileSync(
       renderedAt: new Date().toISOString(),
       size: box,
       updateSize: updateBox,
+      wideSize: wideBox,
     },
     null,
     2

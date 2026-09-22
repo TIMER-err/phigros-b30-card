@@ -1,0 +1,125 @@
+{{extend defaultLayout}}
+
+{{block 'css'}}
+<link rel="stylesheet" href="{{_res_path}}html/b19/b19.css">
+<link rel="stylesheet" href="{{tplResPath}}wide.css">
+{{/block}}
+
+{{block 'main'}}
+<div class="wide">
+
+  <aside class="side">
+    <div class="who">
+      <img class="avatar" src="{{_res_path}}html/avatar/{{gameuser.avatar}}.png" alt="{{gameuser.avatar}}">
+      <div class="who-text">
+        <p class="name" name="pvis">{{#gameuser.PlayerId}}</p>
+        <p class="date">{{Date}}</p>
+      </div>
+    </div>
+
+    <div class="rks-big">
+      <p class="rks-label">RANKING SCORE</p>
+      <p class="rks-value">{{Rks}}</p>
+      {{if rksDelta}}<p class="rks-delta {{rksDelta.startsWith('+') ? 'up' : 'down'}}">{{rksDelta}}</p>{{/if}}
+    </div>
+
+    <div class="chips">
+      <div class="chip clg">
+        <img src="{{_res_path}}html/otherimg/{{ChallengeMode}}.png" alt="Challenge">
+        <p>{{ChallengeModeRank}}</p>
+      </div>
+      <div class="chip data">
+        <img src="{{_res_path}}html/otherimg/data.png" alt="data">
+        <p>{{gameuser.data}}</p>
+      </div>
+    </div>
+
+    <div class="stats">
+      {{each stats v}}
+      <div class="stat stat-{{v.title}}">
+        <p class="stat-title">{{v.title}}</p>
+        <p class="stat-num">{{v.cleared}}</p>
+        <p class="stat-sub">
+          <img class="stat-phi" src="{{_res_path}}html/otherimg/phi.png" alt="phi"><span class="stat-phi-n">{{v.phi}}</span>
+        </p>
+      </div>
+      {{/each}}
+    </div>
+
+    <div class="chart">
+      <div class="chart-head">
+        <p>RKS TREND</p>
+        <p>{{rks_range[0].toFixed(2)}} → {{rks_range[1].toFixed(2)}}</p>
+      </div>
+      <div class="chart-body">
+        {{if rks_history[0]}}
+        <svg preserveAspectRatio="none">
+          <defs>
+            <marker id="dot" viewBox="0 0 4 4" markerWidth="4" markerHeight="4" refX="2" refY="2">
+              <circle cx="2" cy="2" r="1.4"></circle>
+            </marker>
+          </defs>
+          {{each rks_history}}
+          <line x1="{{$value[0]}}%" y1="{{$value[1]}}%" x2="{{$value[2]}}%" y2="{{$value[3]}}%"></line>
+          {{/each}}
+        </svg>
+        {{else}}
+        <p class="no-data">NO_DATA</p>
+        {{/if}}
+      </div>
+      <div class="chart-foot">
+        <p>{{rks_date[0]}}</p>
+        <p>{{rks_date[1]}}</p>
+      </div>
+    </div>
+  </aside>
+
+  <main class="grid">
+    {{each cards card}}
+    <div class="cell">
+      <div class="song {{card.isPhi ? 'phi_song' : 'b_song'}}">
+        <div class="ill-box">
+          <div class="num clip-box">
+            {{if card.isPhi}}<img class="num-phi" src="{{_res_path}}html/otherimg/phi.png" alt="phi">{{/if}}
+            <p name="pvis">{{card.label}}</p>
+          </div>
+          <div class="ill clip-box">
+            <img src="{{card.illustration}}" alt="ill">
+          </div>
+          <div class="rank-{{card.rank}} clip-box">
+            <div class="org">
+              <p>{{card.rank}}&ensp;{{card.difficulty.toFixed(1)}}</p>
+            </div>
+            <div class="rel">
+              <p>{{card.rks.toFixed(2)}}</p>
+            </div>
+          </div>
+        </div>
+        <div class="info-{{card.rank}}">
+          <div class="songname">
+            <p name="pvis">{{card.song}}</p>
+          </div>
+          <div class="songinfo">
+            <div class="Rating">
+              <img src="{{_res_path}}html/otherimg/{{card.Rating}}.png" alt="{{card.Rating}}">
+            </div>
+            <div class="chengji">
+              <div class="score">
+                <p>{{card.score}}</p>
+              </div>
+              <div class="line"></div>
+              <div class="acc-box">
+                <div class="acc">
+                  <p>{{card.acc.toFixed(2)}}%</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    {{/each}}
+  </main>
+
+</div>
+{{/block}}
