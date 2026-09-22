@@ -278,10 +278,12 @@ body {
    text baseline like a glyph. The line box keeps b19's 130% of 9px so the digits
    land exactly where they do on the tall card -- near the badge's top edge. */
 .cell .num {
-  /* The inline strut is sized from this element, not from the 9px <p>, so the
-     font-size has to match or the baseline drops a few px. */
+  /* The inline strut is sized from this element rather than the 9px <p>, so the
+     font-size must match it. line-height then equals the badge height, whose
+     half-leading centres the text -- b19 hugs the top instead, which reads as
+     off-centre once the badge stands alone in the grid. */
   font-size: 9px;
-  line-height: 11.7px;
+  line-height: 15.6px;
   text-align: center;
 }
 
@@ -291,7 +293,9 @@ body {
 }
 
 .cell .num-phi {
-  height: 9px;
+  /* Sits on the baseline like a glyph; matching the digits' cap height keeps
+     the icon from poking above them. */
+  height: 8px;
   width: auto;
   margin-right: 1px;
   /* phi.png is gold; the badge is white with black text. */
