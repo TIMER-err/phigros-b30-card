@@ -2,16 +2,23 @@
 
 <p align="center">
   把 Phigros 成绩图挂到 GitHub Profile 上，每天自动更新。<br>
-  图片和 QQ 机器人里 <a href="https://github.com/Catrong/phi-plugin">phi-plugin</a> 的 <code>/b30</code> <b>完全一致</b>。
+  图片和 QQ 机器人里 <a href="https://github.com/Catrong/phi-plugin">phi-plugin</a> 的 <code>/b30</code>、<code>/update</code> <b>完全一致</b>。
 </p>
 
 <p align="center">
   <a href="../../actions/workflows/render.yml"><img src="../../actions/workflows/render.yml/badge.svg" alt="Render"></a>
 </p>
 
-<p align="center">
-  <img width="560" src="https://raw.githubusercontent.com/TIMER-err/phigros-b30-card/output/b30.jpg" alt="示例">
-</p>
+<table align="center">
+  <tr>
+    <td align="center"><b>b30.jpg</b> 成绩总览</td>
+    <td align="center"><b>update.jpg</b> 成绩变动</td>
+  </tr>
+  <tr>
+    <td><img width="400" src="https://raw.githubusercontent.com/TIMER-err/phigros-b30-card/output/b30.jpg" alt="B30"></td>
+    <td><img width="400" src="https://raw.githubusercontent.com/TIMER-err/phigros-b30-card/output/update.jpg" alt="Update"></td>
+  </tr>
+</table>
 
 不是重新画一套 UI，而是直接复用 phi-plugin 的 `resources/html/b19/b19.art` 模板、CSS、
 字体和曲绘，用 puppeteer 截图。存档从 TapTap 云存档（LeanCloud）拉取并 AES 解密，
@@ -167,13 +174,25 @@ Phigros 的存档只记录每个谱面的最终成绩，**没有游玩时间戳*
 首次运行时存档里已有的成绩会被标记为**基线**（条目第 5 位为 `true`）——
 它们的真实游玩时间未知，因此写入数据供后续 diff，但不会出现在变动图里。
 
-如果你以前用过 phi-plugin 或 phib19.top，可以一次性导入已有历史：
+日常渲染完全本地累加，不访问任何查分 API。
+
+#### 导入已有历史（可选）
+
+如果你以前用过 phi-plugin 或 phib19.top，可以把已积累的历史一次性导入，
+省去从零开始攒：
 
 ```bash
-npm run seed-history   # 写入 data/history-seed.json，仅此一次访问外部 API
+npm run seed-history                 # 写入 data/history-seed.json
 ```
 
-日常渲染完全本地累加，不访问任何查分 API。
+`seed-history` 是唯一会访问 phi-plugin API 的脚本，跑一次即可。生成的
+`data/history-seed.json` **不纳入版本控制**（否则 fork 本仓库的人会拿到别人的
+历史当基线）。让 CI 用上它有两种方式：
+
+- 本地先跑一次 `npm run render`，再把产出的 `output/history.json` 推到 `output` 分支
+- 或者临时 `git add -f data/history-seed.json` 提交一次，首次 workflow 跑完后再删掉
+
+首次运行后 `history.json` 就在 `output` 分支上了，种子文件不再被读取。
 
 ## 常见问题
 

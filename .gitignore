@@ -7,3 +7,4 @@ out.html
 .env
 .env.*
 *-preview.jpg
+data/history-seed.json
