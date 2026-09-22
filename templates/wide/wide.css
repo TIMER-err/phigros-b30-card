@@ -275,10 +275,13 @@ body {
 
 /* Phi slots are marked with the same icon the score panel uses, not a φ glyph.
    Laying the badge out inline (rather than as flex) lets the icon sit on the
-   text baseline like a glyph; line-height equal to the badge height then
-   centres that single line box vertically. */
+   text baseline like a glyph. The line box keeps b19's 130% of 9px so the digits
+   land exactly where they do on the tall card -- near the badge's top edge. */
 .cell .num {
-  line-height: 15.6px;
+  /* The inline strut is sized from this element, not from the 9px <p>, so the
+     font-size has to match or the baseline drops a few px. */
+  font-size: 9px;
+  line-height: 11.7px;
   text-align: center;
 }
 
