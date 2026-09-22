@@ -100,6 +100,7 @@ jobs:
           publish="$RUNNER_TEMP/publish"
           mkdir -p "$publish"
           cp "$OUT_DIR"/meta.json "$OUT_DIR"/b30.* "$publish/"
+          cp "$OUT_DIR"/update.* "$publish/" 2>/dev/null || true
           cd "$publish"
           git init -q -b output
           git config user.name  "github-actions[bot]"

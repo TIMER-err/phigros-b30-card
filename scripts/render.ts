@@ -11,6 +11,7 @@
  *   B30_NUM                charts to list      (default 33)
  *   IMG_TYPE               jpeg | png          (default jpeg)
  *   THEME                  star | snow | none  (default star)
+ *   UPDATE_CARD            0 to skip the score-history card
  *   FORCE                  set to 1 to re-render even when unchanged
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
@@ -20,6 +21,8 @@ import { Info } from '../src/info'
 import { buildB19, buildStats } from '../src/b19'
 import { IllCache } from '../src/ill'
 import { renderTemplate } from '../src/render'
+import { fetchHistory } from '../src/history'
+import { buildBoxLine, buildRksLine } from '../src/update'
 
 if (existsSync('.env')) process.loadEnvFile('.env')
 
@@ -39,7 +42,10 @@ if (!existsSync(path.join(pluginRoot, 'resources', 'info', 'info.csv'))) {
   throw new Error(`未找到 phi-plugin 资源: ${pluginRoot}`)
 }
 
-const outFile = path.join(outDir, `b30.${imgType === 'png' ? 'png' : 'jpg'}`)
+const ext = imgType === 'png' ? 'png' : 'jpg'
+const outFile = path.join(outDir, `b30.${ext}`)
+const updateFile = path.join(outDir, `update.${ext}`)
+const wantUpdate = env('UPDATE_CARD') !== '0'
 const metaFile = path.join(outDir, 'meta.json')
 
 const save = await fetchSave(token, env('PHIGROS_REGION', 'cn') as Region)
@@ -52,7 +58,8 @@ if (
   !env('FORCE') &&
   prev?.updatedAt === save.updatedAt &&
   prev?.num === num &&
-  existsSync(outFile)
+  existsSync(outFile) &&
+  (!wantUpdate || existsSync(updateFile))
 ) {
   console.log('存档未变化，跳过渲染')
   process.exit(0)
@@ -69,6 +76,23 @@ const bg = save.gameuser.background
   ? info.background(save.gameuser.background)
   : null
 const background = bg ? ills.local(bg) : ''
+
+let history = null
+let boxLine: unknown[] = []
+let rksLine = { rks_history: [] as number[][], rks_range: [0, 0], rks_date: ['', ''] }
+if (wantUpdate) {
+  try {
+    history = await fetchHistory(token)
+    boxLine = buildBoxLine(history, info)
+    rksLine = buildRksLine(history.rks)
+    for (const row of boxLine as any[])
+      for (const b of row) for (const s of b.song) s.illustration = ills.local(s.illustration)
+    console.log(`历史: ${history.rks.length} 个 rks 采样点，${(boxLine as any[]).length} 行成绩变动`)
+  } catch (e) {
+    console.warn(`获取历史记录失败，跳过变动图: ${(e as Error).message}`)
+  }
+}
+
 const { total, failed } = await ills.download()
 console.log(`曲绘: 新下载 ${total} 张，失败 ${failed} 张`)
 
@@ -122,6 +146,46 @@ const box = await renderTemplate(
   { pluginRoot, outFile, type: imgType }
 )
 
+let updateBox = null
+if (history) {
+  const rksDelta =
+    history.rks.length > 1
+      ? history.rks[history.rks.length - 1].value - history.rks[history.rks.length - 2].value
+      : 0
+  const tips = readFileSync(
+    path.join(pluginRoot, 'resources', 'info', 'tips.txt'),
+    'utf8'
+  ).split(/\r?\n/).filter(Boolean)
+
+  updateBox = await renderTemplate(
+    'update/update',
+    {
+      PlayerId: gameuser.PlayerId,
+      Rks: save.summary.rankingScore.toFixed(4),
+      Date: formatted,
+      ChallengeMode: gameuser.ChallengeMode,
+      ChallengeModeRank: gameuser.ChallengeModeRank,
+      background,
+      theme,
+      box_line: boxLine,
+      Notes: 0,
+      tips: tips[Math.floor(Math.random() * tips.length)],
+      task_data: null,
+      dan: null,
+      added_rks_notes: [
+        Math.abs(rksDelta) >= 1e-4
+          ? `${rksDelta > 0 ? '+' : ''}${rksDelta.toFixed(4)}`
+          : '',
+        '',
+      ],
+      ...rksLine,
+      Version: { ver: readVersion() },
+    },
+    { pluginRoot, outFile: updateFile, type: imgType }
+  )
+  console.log(`已生成 ${updateFile} (${updateBox.width}x${updateBox.height})`)
+}
+
 writeFileSync(
   metaFile,
   JSON.stringify(
@@ -132,6 +196,7 @@ writeFileSync(
       num,
       renderedAt: new Date().toISOString(),
       size: box,
+      updateSize: updateBox,
     },
     null,
     2
