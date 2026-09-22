@@ -123,7 +123,8 @@ export function buildBoxLine(
     for (const level of ALL_LEVELS) {
       const entries = levels[level] as ScoreEntry[] | undefined
       if (!entries) continue
-      for (const [acc, score, iso, fc] of entries) {
+      for (const [acc, score, iso, fc, isBaseline] of entries) {
+        if (isBaseline) continue // play date unknown, not a change
         const key = fmtDate(iso)
         let group = byDate.get(key)
         if (!group) {

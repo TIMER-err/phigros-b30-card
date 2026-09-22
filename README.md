@@ -18,10 +18,14 @@
 不依赖任何第三方查分 API。
 
 ```
-TapTap 扫码 ──> sessionToken ──> LeanCloud 取档 ──> AES 解密 ──> 算 B30
-                                                                  │
-    output 分支 <── 截图 <── puppeteer <── art-template <── phi-plugin 模板
+TapTap 扫码 ──> sessionToken ──> LeanCloud 取档 ──> AES 解密 ──┬─> 算 B30 ──────┐
+                                                              │                │
+                                     history.json <── 逐日 diff 累加 ──> 成绩变动 ┤
+                                                                               │
+              output 分支 <── 截图 <── puppeteer <── art-template <── phi-plugin 模板
 ```
+
+产出两张图：`b30.jpg`（成绩总览）和 `update.jpg`（成绩变动 + RKS 曲线）。
 
 ## 部署
 
@@ -56,6 +60,7 @@ Settings → Secrets and variables → Actions → Variables：
 | `PHIGROS_REGION` | `cn` | `cn` 国服 / `intl` 国际服 |
 | `B30_NUM` | `33` | 列出的成绩条数，超过 27 的部分显示在 OVER FLOW 之后 |
 | `IMG_TYPE` | `jpeg` | `jpeg` / `png` |
+| `UPDATE_CARD` | `1` | 设为 `0` 关闭成绩变动图 |
 | `PHI_THEME` | `star` | `star` / `snow` / `topText` / 留空 |
 
 ### 改更新时间
@@ -114,7 +119,7 @@ sessionToken 长期有效，除非在别处重新登录把它顶掉。
 
 | 缓存 | 内容 | 作用 |
 | --- | --- | --- |
-| `output` | 上次的图和 `meta.json` | 存档 `updatedAt` 没变则直接跳过渲染，连浏览器都不启动 |
+| `output` 分支 | 上次的图、`meta.json`、`history.json` | 存档 `updatedAt` 没变则跳过渲染；历史记录走 git 而非缓存，不会被驱逐 |
 | `vendor/phi-plugin` | ~126 MB 模板/CSS/字体 | 只做增量 `fetch --depth=1` |
 | `.cache/ill` | 用到的那几十张曲绘 | 曲绘仓库有 2.7 GB，这里只取需要的 |
 | `~/.cache/puppeteer` | Chromium | 免去每次下载浏览器 |
@@ -139,6 +144,8 @@ FORCE=1 npm run render  # 存档没变也重渲
 | `src/reader.ts` | 存档二进制格式的 LEB128 varint 读取器 |
 | `src/info.ts` | 从 phi-plugin 的 `info.csv` 读定数表，解析曲绘/头像/背景资源 |
 | `src/b19.ts` | 复刻 `Save.getB19`：单曲 rks、φ1-3、B27、推分建议 |
+| `src/history.ts` | 历史记录的读写与逐日 diff 累加 |
+| `src/update.ts` | 复刻 `session.js` 的 `box_line` 分行布局和 RKS 折线 |
 | `src/ill.ts` | 按需下载曲绘到本地缓存 |
 | `src/render.ts` | art-template 编译 `.art` + puppeteer 截图 |
 
@@ -149,6 +156,24 @@ RKS 计算：单谱 `acc < 70` 记 0，否则 `((acc - 55) / 45)² × 定数`；
 
 未实现 phi-plugin 中依赖其查分 API 的两处：同 rks 玩家平均 ACC（卡片上的 `Avg:` 标签）
 和 B30 数据分析面板（雷达图 + 直方图）。
+
+### 成绩历史
+
+Phigros 的存档只记录每个谱面的最终成绩，**没有游玩时间戳**。所以"哪天打的"必须靠
+逐次 diff 攒出来：每天拉到新存档后和 `history.json` 比对，把变动的谱面按存档的
+`modifiedAt` 记一笔。这份历史存在 `output` 分支，用 git 恢复而不是 Actions 缓存，
+避免缓存驱逐导致数据丢失。
+
+首次运行时存档里已有的成绩会被标记为**基线**（条目第 5 位为 `true`）——
+它们的真实游玩时间未知，因此写入数据供后续 diff，但不会出现在变动图里。
+
+如果你以前用过 phi-plugin 或 phib19.top，可以一次性导入已有历史：
+
+```bash
+npm run seed-history   # 写入 data/history-seed.json，仅此一次访问外部 API
+```
+
+日常渲染完全本地累加，不访问任何查分 API。
 
 ## 常见问题
 

@@ -41,13 +41,17 @@ jobs:
           node-version: 22
           cache: npm
 
-      # Previous render + meta.json: lets an unchanged save skip the whole render.
-      - name: Cache output
-        uses: actions/cache@v4
-        with:
-          path: output
-          key: b30-output-${{ github.run_id }}
-          restore-keys: b30-output-
+      # history.json is irreplaceable, so it comes from the output branch itself
+      # rather than a cache that GitHub may evict.
+      - name: Restore previous output
+        run: |
+          mkdir -p "$OUT_DIR"
+          if git fetch --depth=1 origin output 2>/dev/null; then
+            git archive FETCH_HEAD | tar -x -C "$OUT_DIR"
+            echo "已恢复: $(ls "$OUT_DIR" | tr '\n' ' ')"
+          else
+            echo "output 分支不存在，首次运行"
+          fi
 
       # ~126 MB checkout (templates, CSS, fonts, avatars).
       - name: Cache phi-plugin
@@ -99,7 +103,7 @@ jobs:
           if [ ! -f "$OUT_DIR/meta.json" ]; then echo "没有产物，跳过发布"; exit 0; fi
           publish="$RUNNER_TEMP/publish"
           mkdir -p "$publish"
-          cp "$OUT_DIR"/meta.json "$OUT_DIR"/b30.* "$publish/"
+          cp "$OUT_DIR"/meta.json "$OUT_DIR"/history.json "$OUT_DIR"/b30.* "$publish/"
           cp "$OUT_DIR"/update.* "$publish/" 2>/dev/null || true
           cd "$publish"
           git init -q -b output

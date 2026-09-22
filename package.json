@@ -6,7 +6,8 @@
   "scripts": {
     "render": "tsx scripts/render.ts",
     "typecheck": "tsc --noEmit",
-    "login": "tsx scripts/login.ts"
+    "login": "tsx scripts/login.ts",
+    "seed-history": "tsx scripts/seed-history.ts"
   },
   "dependencies": {
     "art-template": "^4.13.2",

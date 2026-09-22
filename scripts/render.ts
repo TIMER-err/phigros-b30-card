@@ -21,7 +21,7 @@ import { Info } from '../src/info'
 import { buildB19, buildStats } from '../src/b19'
 import { IllCache } from '../src/ill'
 import { renderTemplate } from '../src/render'
-import { fetchHistory } from '../src/history'
+import { loadHistory, mergeSave, writeHistory } from '../src/history'
 import { buildBoxLine, buildRksLine } from '../src/update'
 
 if (existsSync('.env')) process.loadEnvFile('.env')
@@ -77,21 +77,20 @@ const bg = save.gameuser.background
   : null
 const background = bg ? ills.local(bg) : ''
 
-let history = null
-let boxLine: unknown[] = []
-let rksLine = { rks_history: [] as number[][], rks_range: [0, 0], rks_date: ['', ''] }
-if (wantUpdate) {
-  try {
-    history = await fetchHistory(token)
-    boxLine = buildBoxLine(history, info)
-    rksLine = buildRksLine(history.rks)
-    for (const row of boxLine as any[])
-      for (const b of row) for (const s of b.song) s.illustration = ills.local(s.illustration)
-    console.log(`历史: ${history.rks.length} 个 rks 采样点，${(boxLine as any[]).length} 行成绩变动`)
-  } catch (e) {
-    console.warn(`获取历史记录失败，跳过变动图: ${(e as Error).message}`)
-  }
-}
+// History is accumulated locally: the save has no per-chart timestamps, so each
+// run dates the charts that changed with the save's own modifiedAt.
+const historyFile = path.join(outDir, 'history.json')
+const history = loadHistory(historyFile, path.resolve('data/history-seed.json'))
+const addedScores = mergeSave(history, save)
+writeHistory(historyFile, history)
+
+const boxLine = wantUpdate ? buildBoxLine(history, info) : []
+const rksLine = buildRksLine(history.rks)
+for (const row of boxLine)
+  for (const b of row) for (const s of b.song) s.illustration = ills.local(s.illustration)
+console.log(
+  `历史: 新增 ${addedScores} 条成绩，共 ${history.rks.length} 个 rks 采样点，${boxLine.length} 行变动`
+)
 
 const { total, failed } = await ills.download()
 console.log(`曲绘: 新下载 ${total} 张，失败 ${failed} 张`)
@@ -147,7 +146,7 @@ const box = await renderTemplate(
 )
 
 let updateBox = null
-if (history) {
+if (wantUpdate) {
   const rksDelta =
     history.rks.length > 1
       ? history.rks[history.rks.length - 1].value - history.rks[history.rks.length - 2].value
