@@ -6,3 +6,4 @@ out.html
 *.log
 .env
 .env.*
+*-preview.jpg
